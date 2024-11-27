@@ -1,14 +1,23 @@
 import * as BABYLON from '@babylonjs/core';
+import { UIScene } from './UIScene';
+import { PathfindingSystem } from '../systems/pathfinding';
+import { WaveManager } from '../systems/waveManager';
 
 export class MainScene {
     constructor(canvas) {
         this.canvas = canvas;
         this.engine = new BABYLON.Engine(this.canvas, true);
         this.scene = new BABYLON.Scene(this.engine);
+        this.uiScene = new UIScene(this.scene);
         this.gridSize = 8;
         this.cellSize = 5;
         this.pathSize = 2.5;
         this.grid = [];
+        this.selectedTowerType = null;
+        this.towers = [];
+
+        this.pathfinding = new PathfindingSystem(this.scene, this.gridSize, this.pathSize);
+        this.waveManager = new WaveManager(this.scene, this.pathfinding, this.uiScene);
 
         this._createScene();
         this._createGrid();
@@ -76,5 +85,37 @@ export class MainScene {
         cell.metadata.isBlocked = !cell.metadata.isBlocked;
         cell.material = new BABYLON.StandardMaterial("cellMaterial", this.scene);
         cell.material.diffuseColor = cell.metadata.isBlocked ? BABYLON.Color3.Red() : BABYLON.Color3.Green();
+
+        this.pathfinding.initializeGrid(this.grid);
+        const pathExists = this.pathfinding.findPath();
+        
+        if (!pathExists && cell.metadata.isBlocked) {
+            cell.metadata.isBlocked = false;
+            cell.material.diffuseColor = BABYLON.Color3.Green();
+            this.pathfinding.initializeGrid(this.grid);
+            this.pathfinding.findPath();
+        }
+    }
+
+    _placeTower(cell) {
+        if (cell.metadata.isBlocked || !this.selectedTowerType) return;
+
+        const tower = BABYLON.MeshBuilder.CreateCylinder("tower", {
+            height: 3,
+            diameter: this.cellSize * 0.7
+        }, this.scene);
+
+        tower.position = new BABYLON.Vector3(
+            cell.position.x,
+            1.5,
+            cell.position.z
+        );
+
+        cell.metadata.hasTower = true;
+        this.towers.push(tower);
+    }
+
+    setSelectedTower(towerType) {
+        this.selectedTowerType = towerType;
     }
 }
